@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BarberFlow - Agendamento & Gestão</title>
+    <style>
+        :root {
+            --primary: #e67e22;
+            --dark: #1a1a1a;
+            --card: #2c3e50;
+            --text: #ecf0f1;
+            --success: #25d366;
+            --alert: #e74c3c;
+        }
+
+        body {
+            background-color: var(--dark);
+            color: var(--text);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 450px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        /* Navegação */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            width: 100%;
+        }
+        .tabs button {
+            flex: 1;
+            background: #34495e;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .tabs button.active {
+            background: var(--primary);
+        }
+
+        header { text-align: center; margin-bottom: 20px; }
+        header h1 span { color: var(--primary); }
+
+        .card {
+            background: var(--card);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+        }
+
+        h3 { margin-top: 0; font-size: 1.1rem; color: var(--primary); }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0 18px 0;
+            border-radius: 8px;
+            border: 1px solid #3d5166;
+            background: #1a252f;
+            color: white;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+
+        .btn-whatsapp {
+            width: 100%;
+            background-color: var(--success);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* Painel Admin */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #34495e;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border-bottom: 4px solid var(--primary);
+        }
+
+        .lista-agendamentos {
+            list-style: none;
+            padding: 0;
+        }
+        .lista-item {
+            background: #1a252f;
+            margin-bottom: 10px;
+            padding: 12px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid var(--primary);
+        }
+        
+        /* Estilo do Alerta */
+        .proximo-alerta {
+            border-left: 4px solid var(--success) !important;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0px rgba(37, 211, 102, 0.4); }
+            100% { box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); }
+        }
+
+        .badge {
+            background: var(--primary);
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .btn-delete {
+            background: none;
+            border: none;
+            color: #e74c3c;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <nav class="tabs">
+            <button id="btn-cliente" class="active" onclick="mudarAba('cliente')">AGENDAR</button>
+            <button id="btn-admin" onclick="mudarAba('admin')">PAINEL ADMIN</button>
+        </nav>
+
+        <div id="view-cliente">
+            <header>
+                <h1>Barber<span>Flow</span></h1>
+            </header>
+            <section class="card">
+                <h3>Seu Nome</h3>
+                <input type="text" id="nome-cliente" placeholder="Digite seu nome">
+                <h3>Serviço</h3>
+                <select id="servico">
+                    <option value="40">Corte Masculino - R$ 40</option>
+                    <option value="30">Barba - R$ 30</option>
+                    <option value="25">Manicure - R$ 25</option>
+                </select>
+                <h3>Data e Hora</h3>
+                <input type="date" id="data">
+                <input type="time" id="hora">
+                <button onclick="enviarAgendamento()" class="btn-whatsapp">Confirmar Agendamento</button>
+            </section>
+        </div>
+
+        <div id="view-admin" style="display:none;">
+            <header>
+                <h1>Gestão <span>Ativa</span></h1>
+            </header>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <small>Faturamento</small>
+                    <h2 id="total-vendas">R$ 0,00</h2>
+                </div>
+                <div class="stat-card">
+                    <small>Lembretes</small>
+                    <h2 id="status-alerta" style="font-size: 0.9rem; color: var(--success);">Monitorando...</h2>
+                </div>
+            </div>
+            <section class="card">
+                <h3>Clientes de Hoje</h3>
+                <ul id="lista-agendamentos" class="lista-agendamentos"></ul>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        let agendamentos = JSON.parse(localStorage.getItem('barberflow_db')) || [];
+
+        // Solicitar permissão para notificações
+        if (Notification.permission !== "granted") {
+            Notification.requestPermission();
+        }
+
+        function mudarAba(aba) {
+            document.getElementById('view-cliente').style.display = aba === 'admin' ? 'none' : 'block';
+            document.getElementById('view-admin').style.display = aba === 'admin' ? 'block' : 'none';
+            document.getElementById('btn-admin').classList.toggle('active', aba === 'admin');
+            document.getElementById('btn-cliente').classList.toggle('active', aba === 'cliente');
+            if(aba === 'admin') carregarPainel();
+        }
+
+        function enviarAgendamento() {
+            const nome = document.getElementById('nome-cliente').value;
+            const select = document.getElementById('servico');
+            const data = document.getElementById('data').value;
+            const hora = document.getElementById('hora').value;
+
+            if (!nome || !data || !hora) return alert("Preencha tudo!");
+
+            const novo = {
+                id: Date.now(),
+                cliente: nome,
+                servico: select.options[select.selectedIndex].text,
+                valor: parseFloat(select.value),
+                data: data,
+                hora: hora,
+                lembreteEnviado: false
+            };
+
+            agendamentos.push(novo);
+            localStorage.setItem('barberflow_db', JSON.stringify(agendamentos));
+            
+            // Simulação de link WhatsApp
+            const msg = `Olá, sou ${nome}. Agendei ${novo.servico} para as ${hora}.`;
+            window.open(`https://api.whatsapp.com/send?phone=5511999999999&text=${msg}`);
+        }
+
+        function carregarPainel() {
+            const lista = document.getElementById('lista-agendamentos');
+            let faturamento = 0;
+            lista.innerHTML = "";
+
+            agendamentos.forEach(ag => {
+                faturamento += ag.valor;
+                lista.innerHTML += `
+                    <li class="lista-item" id="item-${ag.id}">
+                        <div>
+                            <strong>${ag.hora} - ${ag.cliente}</strong>
+                            <small>${ag.servico}</small>
+                        </div>
+                        <button class="btn-delete" onclick="remover(${ag.id})">Remover</button>
+                    </li>
+                `;
+            });
+            document.getElementById('total-vendas').innerText = `R$ ${faturamento.toFixed(2)}`;
+        }
+
+        function remover(id) {
+            agendamentos = agendamentos.filter(a => a.id !== id);
+            localStorage.setItem('barberflow_db', JSON.stringify(agendamentos));
+            carregarPainel();
+        }
+
+        // --- LÓGICA DO LEMBRETE DE 10 MINUTOS ---
+        setInterval(() => {
+            const agora = new Date();
+            const horaAtual = agora.getHours().toString().padStart(2, '0') + ":" + agora.getMinutes().toString().padStart(2, '0');
+            
+            agendamentos.forEach(ag => {
+                // Só avisa se for a data de hoje
+                const hoje = agora.toISOString().split('T')[0];
+                if (ag.data === hoje && !ag.lembreteEnviado) {
+                    
+                    const [h, m] = ag.hora.split(':');
+                    const dataAgendada = new Date();
+                    dataAgendada.setHours(h, m, 0);
+
+                    const diferencaMilissegundos = dataAgendada - agora;
+                    const diferencaMinutos = Math.floor(diferencaMilissegundos / 60000);
+
+                    // Se faltar entre 0 e 10 minutos
+                    if (diferencaMinutos <= 10 && diferencaMinutos > 0) {
+                        dispararAlerta(ag);
+                        ag.lembreteEnviado = true;
+                        localStorage.setItem('barberflow_db', JSON.stringify(agendamentos));
+                    }
+                }
+            });
+        }, 30000); // Checa a cada 30 segundos
+
+        function dispararAlerta(ag) {
+            // 1. Notificação Visual no Navegador
+            if (Notification.permission === "granted") {
+                new Notification("PRÓXIMO CLIENTE!", {
+                    body: `${ag.cliente} em 10 min para ${ag.servico}`,
+                    icon: "https://cdn-icons-png.flaticon.com/512/2821/2821012.png"
+                });
+            }
+
+            // 2. Alerta sonoro básico
+            const beep = new AudioContext();
+            const osc = beep.createOscillator();
+            osc.connect(beep.destination);
+            osc.start();
+            osc.stop(beep.currentTime + 0.5);
+
+            // 3. Destaque na lista (se o admin estiver olhando)
+            const item = document.getElementById(`item-${ag.id}`);
+            if(item) item.classList.add('proximo-alerta');
+        }
+    </script>
+</body>
+</html>
